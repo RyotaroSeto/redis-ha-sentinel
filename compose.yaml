@@ -1,0 +1,168 @@
+# services:
+#   redis-master:
+#     image: redis:7.2.5-bookworm
+#     hostname: redis-master
+#     container_name: redis-master
+#     ports:
+#       - "6379:6379"
+#     environment:
+#       - REDIS_REPLICATION_MODE=master
+
+#   redis-slave:
+#     image: redis:7.2.5-bookworm
+#     container_name: redis-slave
+#     command: ["redis-server", "--slaveof", "redis-master", "6379"]
+#     depends_on:
+#       - redis-master
+#     environment:
+#       - REDIS_REPLICATION_MODE=slave
+#       - REDIS_MASTER_HOST=redis-master
+#       - REDIS_MASTER_PORT=6379
+
+#   sentinel:
+#     image: redis:7.2.5-bookworm
+#     container_name: sentinel
+#     command: ["redis-server", "/usr/local/etc/redis/sentinel.conf", "--sentinel"]
+#     ports:
+#       - "26379:26379"
+#     depends_on:
+#       - redis-master
+#     volumes:
+#       - ./sentinel.conf:/usr/local/etc/redis/sentinel.conf
+#     environment:
+#       - REDIS_MASTER_HOST=redis-master
+#       - REDIS_MASTER_PORT=6379
+#       - REDIS_MASTER_NAME=mymaster
+
+#   prometheus:
+#     image: prom/prometheus:v2.52.0
+#     container_name: prometheus
+#     ports:
+#       - "9090:9090"
+#     volumes:
+#       - ./prometheus.yml:/etc/prometheus/prometheus.yml
+#     command:
+#       - "--config.file=/etc/prometheus/prometheus.yml"
+#     depends_on:
+#       - sentinel
+
+#   sentinel-exporter:
+#     build:
+#       context: .
+#       dockerfile: Dockerfile
+#       target: dev
+#     container_name: sentinel-exporter
+#     ports:
+#       - "9478:9478"
+#     environment:
+#       - REDIS_SENTINEL_HOST=sentinel
+#       - REDIS_SENTINEL_PORT=26379
+#       - REDIS_MASTER_NAME=mymaster
+#     depends_on:
+#       - sentinel
+
+
+
+services:
+  redis-master:
+    image: redis:7.2.5-bookworm
+    hostname: redis-master
+    container_name: redis-master
+    ports:
+      - "6379:6379"
+    environment:
+      - REDIS_REPLICATION_MODE=master
+
+  redis-slave-1:
+    image: redis:7.2.5-bookworm
+    container_name: redis-slave-1
+    command: ["redis-server", "--slaveof", "redis-master", "6379"]
+    depends_on:
+      - redis-master
+    environment:
+      - REDIS_REPLICATION_MODE=slave
+      - REDIS_MASTER_HOST=redis-master
+      - REDIS_MASTER_PORT=6379
+
+  redis-slave-2:
+    image: redis:7.2.5-bookworm
+    container_name: redis-slave-2
+    command: ["redis-server", "--slaveof", "redis-master", "6379"]
+    depends_on:
+      - redis-master
+    environment:
+      - REDIS_REPLICATION_MODE=slave
+      - REDIS_MASTER_HOST=redis-master
+      - REDIS_MASTER_PORT=6379
+
+  sentinel-1:
+    image: redis:7.2.5-bookworm
+    container_name: sentinel-1
+    command: ["redis-server", "/usr/local/etc/redis/sentinel.conf", "--sentinel"]
+    ports:
+      - "26379:26379"
+    depends_on:
+      - redis-master
+    volumes:
+      - ./sentinel.conf:/usr/local/etc/redis/sentinel.conf
+    environment:
+      - REDIS_MASTER_HOST=redis-master
+      - REDIS_MASTER_PORT=6379
+      - REDIS_MASTER_NAME=mymaster
+
+  sentinel-2:
+    image: redis:7.2.5-bookworm
+    container_name: sentinel-2
+    command: ["redis-server", "/usr/local/etc/redis/sentinel.conf", "--sentinel"]
+    ports:
+      - "26380:26379"
+    depends_on:
+      - redis-master
+    volumes:
+      - ./sentinel.conf:/usr/local/etc/redis/sentinel.conf
+    environment:
+      - REDIS_MASTER_HOST=redis-master
+      - REDIS_MASTER_PORT=6379
+      - REDIS_MASTER_NAME=mymaster
+
+  sentinel-3:
+    image: redis:7.2.5-bookworm
+    container_name: sentinel-3
+    command: ["redis-server", "/usr/local/etc/redis/sentinel.conf", "--sentinel"]
+    ports:
+      - "26381:26379"
+    depends_on:
+      - redis-master
+    volumes:
+      - ./sentinel.conf:/usr/local/etc/redis/sentinel.conf
+    environment:
+      - REDIS_MASTER_HOST=redis-master
+      - REDIS_MASTER_PORT=6379
+      - REDIS_MASTER_NAME=mymaster
+
+  haproxy:
+    image: haproxy:2.9.7-alpine
+    container_name: haproxy
+    ports:
+      - "6380:6380"
+    volumes:
+      - ./haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg
+    depends_on:
+      - redis-master
+      - redis-slave-1
+      - redis-slave-2
+      - sentinel-1
+      - sentinel-2
+      - sentinel-3
+
+  client:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: dev
+    container_name: client
+    ports:
+      - "8080:8080"
+    depends_on:
+      - haproxy
+
